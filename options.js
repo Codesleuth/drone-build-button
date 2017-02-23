@@ -1,32 +1,34 @@
 'use strict'
 
-const urlBox = document.getElementById('drone-url')
-const tokenBox = document.getElementById('drone-token')
+const droneUrlBox = document.getElementById('drone-url')
+const droneTokenBox = document.getElementById('drone-token')
 const saveButton = document.getElementById('save-button')
 
 console.log(saveButton)
 
 function save (e) {
   const blob = {
-    drone_url: urlBox.value,
-    drone_token: tokenBox.value
+    drone: {
+      url: droneUrlBox.value,
+      token: droneTokenBox.value
+    }
   }
   console.log(blob)
   chrome.storage.sync.set(blob, function () {
-    urlBox.classList.remove('is-warning')
-    tokenBox.classList.remove('is-warning')
-    urlBox.classList.add('is-success')
-    tokenBox.classList.add('is-success')
+    clean(droneUrlBox)
+    clean(droneTokenBox)
   })
 }
 
 function load (e) {
   chrome.storage.sync.get({
-    drone_url: null,
-    drone_token: null
+    drone: {
+      url: null,
+      token: null
+    }
   }, function (items) {
-    urlBox.value = items.drone_url
-    tokenBox.value = items.drone_token
+    droneUrlBox.value = items.drone.url
+    droneTokenBox.value = items.drone.token
   })
 }
 
@@ -35,8 +37,13 @@ function dirty (e) {
   e.target.classList.add('is-warning')
 }
 
+function clean (element) {
+  element.classList.remove('is-warning')
+  element.classList.add('is-success')
+}
+
 document.addEventListener('DOMContentLoaded', load)
 saveButton.addEventListener('click', save)
 
-urlBox.addEventListener('input', dirty)
-tokenBox.addEventListener('input', dirty)
+droneUrlBox.addEventListener('input', dirty)
+droneTokenBox.addEventListener('input', dirty)

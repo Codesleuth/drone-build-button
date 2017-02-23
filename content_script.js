@@ -1,15 +1,44 @@
 'use strict'
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  if (msg.command && (msg.command === 'get_pr_details')) {
-    const element = document.getElementById('partial-pull-merging')
-    const channels = element.getAttribute('data-channel').split(' ')
+  if (!msg.command || msg.command !== 'get_commit_details') return
 
-    // tenant:1:repo:692:branch:feature/name tenant:1:repo:692:branch:master tenant:1:repo:692:commit:xxxxxxxxxxyyyyyyyyyyxxxxxxxxxxyyyyyyyyyy tenant:1:issue:17153:state
+  const urlParts = document.location.toString().match(/(https?:\/\/.+\..+\/(.+)\/(.+))\/commit\/([a-f0-9]+)/)
 
-    const [ , , , repoId, , branch ] = channels[0].split(':')
-    const head = channels[2].split(':')[5]
-
-    sendResponse({ repoId, branch, head })
+  if (!urlParts) {
+    sendResponse({ ok: false, error: 'This is not a commit page' })
+    return
   }
+
+  const message = document.title.match(/(.+)\s·/)[1]
+  const [commitUrl, repoUrl, org, repo, sha] = urlParts
+  const repoId = document.querySelector('div[data-upload-repository-id]').attributes['data-upload-repository-id'].value
+  const branch = document.querySelector('ul.branches-list>li.branch>a').innerHTML
+  const timestamp = document.querySelector('relative-time').attributes['datetime'].value
+
+  const authorImg = document.querySelector('span.commit-author-section>img')
+  const authorUsername = authorImg.attributes['alt'].value.slice(1)
+  const authorAvatar = authorImg.attributes['src'].value
+
+  sendResponse({ ok: true, result: {
+    branch,
+    org: {
+      name: org
+    },
+    repo: {
+      id: repoId,
+      name: repo,
+      url: repoUrl
+    },
+    commit: {
+      id: sha, 
+      message,
+      url: commitUrl,
+      timestamp,
+      author: {
+        name: authorUsername,
+        avatar_url: authorAvatar
+      }
+    }
+  }})
 })

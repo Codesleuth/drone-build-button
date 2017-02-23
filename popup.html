@@ -1,11 +1,25 @@
 <!doctype html>
 <html>
-  <head>
-    <title>Drone Build Button</title>
-    <script src="popup.js"></script>
-  </head>
-  <body>
-    <h1>Drone Build Button</h1>
+<head>
+  <title>Drone Build Button</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.3.1/css/bulma.min.css" />
+  <script src="popup.js"></script>
+  <style>
+    body {
+      margin: 20px;
+    }
+    .x-hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container is-fluid" style="width: 300px" >
+    <h1 class="title">Drone Build Button</h1>
+    <div id="notification" class="notification x-hidden">
+      Nothing yet...
+    </div>
     <button id="build-button">Build!</button>
-  </body>
+  </div>
+</body>
 </html>

@@ -1,10 +1,18 @@
 'use strict'
 
+let notification = null
+
 function getSettings() {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get({
-      drone_url: null,
-      drone_token: null
+      drone: {
+        url: null,
+        token: null,
+      },
+      github: {
+        enterprise: true,
+        token: null
+      }
     }, (settings) => {
       if (settings) return resolve(settings)
       reject(chrome.runtime.lastError)
@@ -14,16 +22,19 @@ function getSettings() {
 
 function guid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8)
+    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
   })
 }
 
-function postBuild(payload) {
+function postPushPayload(payload) {
+  const hookId = guid()
+
   const headers = new Headers()
   headers.append('Content-Type', 'application/json')
-  headers.append('X-Github-Event', 'pull_request')
-  headers.append('X-Github-Delivery', guid())
+  headers.append('X-Github-Event', 'push')
+  headers.append('X-Github-Delivery', hookId)
+  headers.append('User-Agent', `GitHub-Hookshot/${hookId.slice(0, 7)}`)
 
   const options = {
     method: 'POST',
@@ -34,11 +45,14 @@ function postBuild(payload) {
   }
 
   getSettings().then((settings) => {
-    const req = new Request(`${settings.drone_url}/hook?access_token=${settings.drone_token}`, options)
-    return fetch(req).then(function (res) {
+    const req = new Request(`${settings.drone.url}/hook?access_token=${settings.drone.token}`, options)
+    return fetch(req).then((res) => {
       return res.blob()
-    }).then(function (myBlob) {
+    }).then((myBlob) => {
       console.log(myBlob)
+    }).catch((err) => {
+      notification.innerHTML = `There was an error\n<pre>${err.message}</pre>`
+      notification.classList.remove('x-hidden')
     })
   })
 }
@@ -47,82 +61,69 @@ function buildClick() {
 
   chrome.tabs.getSelected(null, function (tab) {
 
-    const matches = tab.url.match(/(https?:\/\/.+\..+\/(.+)\/(.+))\/pull\/([0-9]+)/)
-    if (!matches) return
+    const commitRegex = tab.url.match(/(https?:\/\/.+\..+\/(.+)\/(.+))\/commit\/([a-f0-9]+)/)
+    if (!commitRegex) return
 
-    chrome.tabs.sendMessage(tab.id, { command: "get_pr_details" }, function (response) {
-      const url = tab.url
-      const repoUrl = matches[1]
-      const owner = matches[2]
-      const repo = matches[3]
-      const issue = matches[4]
-      const title = tab.title.match(/(.*) by .+ Pull Request \#/)[1]
+    chrome.tabs.sendMessage(tab.id, { command: "get_commit_details" }, function (response) {
+      if (!response.ok) {
+        console.error(response.error)
+        return
+      }
 
-      const payload = createPRHook({
-        repo: {
-          id: response.repoId,
-          name: repo,
-          owner,
-          url: repoUrl
-        },
-        pull: {
-          number: issue,
-          url,
-          title
-        },
-        branch: response.branch,
-        commit: response.head,
-        user: {
-          login: 'Codesleuth',
-          avatar_url: 'https://avatars0.githubusercontent.com/u/5011956?v=3&s=460'
-        }
-      })
-
+      const payload = createPushHook(response.result)
       console.log(payload)
-
-      postBuild(payload)
+      postPushPayload(payload)
     })
 
   })
 }
 
-function createPRHook(options) {
+function createPushHook(options) {
   return {
-    "pull_request": {
-      "html_url": options.pull.url,
-      "number": Number(options.pull.number),
-      "title": options.pull.title,
-      "user": {
-        "login": options.user.login,
-        "avatar_url": options.user.avatar_url
+    "ref": `refs/heads/${options.branch}`,
+    "created": false,
+    "deleted": false,
+    "head_commit": {
+      "id": options.commit.id,
+      "url": options.commit.url,
+      "message": options.commit.message,
+      "timestamp": options.commit.timestamp,
+      "author": {
+        "name": options.commit.author.name,
+        "email": "noreply@example.com",
+        "username": options.commit.author.name,
       },
-      "head": {
-        "ref": options.branch,
-        "sha": options.commit,
-        "repo": {
-          "clone_url": `${options.repo.url}.git`
-        }
-      },
-      "base": {
-        "ref": "master"
+      "committer": {
+        "name": options.commit.author.name,
+        "email": "noreply@example.com",
+        "username": options.commit.author.name,
       }
     },
+    "sender": {
+      "login": options.commit.author.name,
+      "avatar_url": options.commit.author.avatar_url
+    },
     "repository": {
+      "owner": {
+        "login": options.org.name,
+        "name": options.org.name
+      },
       "id": Number(options.repo.id),
       "name": options.repo.name,
-      "owner": {
-        "login": options.repo.owner
-      },
+      "full_name": `${options.org.name}/${options.repo.name}`,
+      "language": 'JavaScript',
       "private": true,
       "html_url": options.repo.url,
-      "clone_url": `${options.repo.url}.git`
-    },
+      "clone_url": `${options.repo.url}.git`,
+      "default_branch": "master"
+    }
   }
 }
 
 function loadExtension() {
-  var buildButton = document.getElementById('build-button')
+  const buildButton = document.getElementById('build-button')
   buildButton.addEventListener('click', buildClick, false)
+  notification = document.getElementById('notification')
 }
 
 
