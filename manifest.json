@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Drone Build Button",
-  "description": "A Chrome Extension to scrape a Github PR page and send a pull_request hook to a Drone server.",
-  "version": "0.1",
+  "description": "A Chrome Extension to send commit build hooks to Drone.",
+  "version": "0.2",
   "browser_action": {
     "default_icon": "icon.png",
     "default_popup": "popup.html"
@@ -11,14 +11,10 @@
     "activeTab",
     "storage",
     "webRequestBlocking",
-    "*://*/commit/*"
+    "*://*"
   ],
   "options_ui": {
     "page": "options.html",
     "chrome_style": true
-  },
-  "content_scripts": [{
-    "matches": ["*://*/*"],
-    "js": ["content_script.js"]
-  }]
+  }
 }
