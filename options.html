@@ -7,6 +7,10 @@
     body {
       overflow: hidden;
     }
+
+    #opts {
+      width: 500px;
+    }
   </style>
 </head>
 <body>
@@ -14,23 +18,21 @@
 <section class="section">
   <div class="container">
 
-    <div class="control is-horizontal">
-      <div class="control-label">
-        <label class="label">Drone</label>
+    <form id="opts">
+      <div class="field-label">
+        <label class="label">GitHub Personal Access Token</label>
       </div>
-      <div class="control is-grouped">
-        <p class="control is-expanded">
-          <input id="drone-url" class="input" type="text" placeholder="URL e.g. https://my.drone.com">
-        </p>
-        <p class="control is-expanded">
-          <input id="drone-token" class="input" type="text" placeholder="Token e.g. eyxxxxxxd...">
-        </p>
+      <div class="field-body">
+        <div class="field is-grouped">
+          <p class="control is-expanded">
+            <input id="github-token" class="input" type="text" placeholder="Token...">
+          </p>
+          <p class="control">
+            <button id="save-token" class="button is-info">Save</button>
+          </p>
+        </div>
       </div>
-    </div>
-
-    <div class="control">
-      <button id="save-button" class="button is-primary">Save</button>
-    </div>
+    </form>
 
   </div>
 </section>

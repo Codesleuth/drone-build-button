@@ -1,34 +1,26 @@
 'use strict'
 
-const droneUrlBox = document.getElementById('drone-url')
-const droneTokenBox = document.getElementById('drone-token')
-const saveButton = document.getElementById('save-button')
-
-console.log(saveButton)
+const tokenBox = document.getElementById('github-token')
+const saveButton = document.getElementById('save-token')
 
 function save (e) {
   const blob = {
-    drone: {
-      url: droneUrlBox.value,
-      token: droneTokenBox.value
+    github: {
+      token: tokenBox.value
     }
   }
-  console.log(blob)
   chrome.storage.sync.set(blob, function () {
-    clean(droneUrlBox)
-    clean(droneTokenBox)
+    clean(tokenBox)
   })
 }
 
 function load (e) {
   chrome.storage.sync.get({
-    drone: {
-      url: null,
+    github: {
       token: null
     }
   }, function (items) {
-    droneUrlBox.value = items.drone.url
-    droneTokenBox.value = items.drone.token
+    tokenBox.value = items.github.token
   })
 }
 
@@ -44,6 +36,4 @@ function clean (element) {
 
 document.addEventListener('DOMContentLoaded', load)
 saveButton.addEventListener('click', save)
-
-droneUrlBox.addEventListener('input', dirty)
-droneTokenBox.addEventListener('input', dirty)
+tokenBox.addEventListener('input', dirty)

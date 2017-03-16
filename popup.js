@@ -5,12 +5,7 @@ let notification = null
 function getSettings() {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get({
-      drone: {
-        url: null,
-        token: null,
-      },
       github: {
-        enterprise: true,
         token: null
       }
     }, (settings) => {
@@ -27,7 +22,7 @@ function guid() {
   })
 }
 
-function postPushPayload(payload) {
+function pushToDrone(payload, droneUrl) {
   const hookId = guid()
 
   const headers = new Headers()
@@ -44,36 +39,209 @@ function postPushPayload(payload) {
     body: JSON.stringify(payload)
   }
 
-  getSettings().then((settings) => {
-    const req = new Request(`${settings.drone.url}/hook?access_token=${settings.drone.token}`, options)
+  return new Promise((resolve, reject) => {
+    const req = new Request(droneUrl, options)
     return fetch(req).then((res) => {
-      return res.blob()
-    }).then((myBlob) => {
-      console.log(myBlob)
-    }).catch((err) => {
-      notification.innerHTML = `There was an error\n<pre>${err.message}</pre>`
-      notification.classList.remove('x-hidden')
+      if (res.ok) return res.json()
+      throw new Error(`Push to Drone failed! ${res.status}`)
+    }).then((res) => {
+      log('Pushed!', res)
     })
+  })
+
+  return getSettings().then((settings) => {
+
+  })
+}
+
+function log(line, data) {
+  notification.textContent = line
+  notification.classList.remove('x-hidden')
+
+  console.log(line, data)
+}
+
+function getFirstHookUrl(server, token, owner, repo) {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${token}`)
+
+    const options = {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'default',
+      headers
+    }
+    const req = new Request(`${server}/api/v3/repos/${owner}/${repo}/hooks`, options)
+
+    return fetch(req).then((res) => {
+      if (res.ok) return res.json()
+      throw new Error('Could not get hook info from API')
+    }).then((hookInfo) => {
+      if (hookInfo.length === 0) return reject(new Error('No hooks found'))
+      resolve(hookInfo[0].config.url)
+    })
+  })
+}
+
+function findCommitInBranch(server, token, owner, repo, sha, branch) {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${token}`)
+
+    const options = {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'default',
+      headers
+    }
+    const req = new Request(`${server}/api/v3/repos/${owner}/${repo}/commits?sha=${branch}`, options)
+
+    return fetch(req).then((res) => {
+      if (res.ok) return res.json()
+      throw new Error('Could not get commits for branch from API')
+    }).then((info) => {
+      const found = info.find((e) => e.sha === sha)
+      resolve(found || null)
+    })
+  })
+}
+
+function searchBranchesForCommit(server, token, owner, repo, branches, sha) {
+  return new Promise((resolve, reject) => {
+    function next(index) {
+      const branch = branches[index].name
+      findCommitInBranch(server, token, owner, repo, sha, branch)
+        .then((found) => {
+          if (found) return resolve(branch)
+          if (branches.length > index + 1) return next(index + 1)
+          resolve(null)
+        })
+    }
+    next(0)
+    // GitHub, sort this shit out you morons...
+  })
+}
+
+function getBranches(server, token, owner, repo) {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${token}`)
+
+    const options = {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'default',
+      headers
+    }
+    const req = new Request(`${server}/api/v3/repos/${owner}/${repo}/branches`, options)
+
+    return fetch(req).then((res) => {
+      if (res.ok) return res.json()
+      throw new Error('Could not get branches from API')
+    }).then((branchesInfo) => {
+      const flattened = branchesInfo.map((e) => ({ name: e.name, sha: e.commit.sha }))
+      resolve(flattened)
+    })
+  })
+}
+
+function getRepoInfo(server, token, owner, repo) {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${token}`)
+
+    const options = {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'default',
+      headers
+    }
+    const req = new Request(`${server}/api/v3/repos/${owner}/${repo}`, options)
+
+    return fetch(req).then((res) => {
+      if (res.ok) return res.json()
+      throw new Error('Could not get repo info from API')
+    }).then((repoInfo) => resolve(repoInfo))
+  })
+}
+
+function getCommitInfo(server, token, owner, repo, sha) {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${token}`)
+
+    const options = {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'default',
+      headers
+    }
+    const req = new Request(`${server}/api/v3/repos/${owner}/${repo}/commits/${sha}`, options)
+
+    return fetch(req).then((res) => {
+      if (res.ok) return res.json()
+      throw new Error('Could not get commit info from API')
+    }).then((commitInfo) => resolve(commitInfo))
   })
 }
 
 function buildClick() {
 
-  chrome.tabs.getSelected(null, function (tab) {
+  chrome.tabs.getSelected(null, (tab) => {
+    const urlRegex = tab.url.match(/^(https?:\/\/.+\..+)\/(.+)\/(.+)\/(?:pull\/\d+\/commits|commit)\/([a-f0-9]+)$/i)
 
-    const commitRegex = tab.url.match(/(https?:\/\/.+\..+\/(.+)\/(.+))\/commit\/([a-f0-9]+)/)
-    if (!commitRegex) return
+    if (!urlRegex) return log('Is this a commit page?!')
 
-    chrome.tabs.sendMessage(tab.id, { command: "get_commit_details" }, function (response) {
-      if (!response.ok) {
-        console.error(response.error)
-        return
-      }
+    const [, server, owner, repo, sha] = urlRegex
 
-      const payload = createPushHook(response.result)
-      console.log(payload)
-      postPushPayload(payload)
-    })
+    log('Getting settings...')
+
+    let token
+
+    getSettings()
+      .then((settings) => {
+        token = settings.github.token
+        log('Gathering information...')
+        return Promise.all([
+          getFirstHookUrl(server, token, owner, repo),
+          getBranches(server, token, owner, repo),
+          getRepoInfo(server, token, owner, repo),
+          getCommitInfo(server, token, owner, repo, sha)
+        ])
+      })
+      .then(([url, branches, repoInfo, commitInfo]) => {
+        return searchBranchesForCommit(server, token, owner, repo, branches, sha).then((found) => {
+          log(`Found this commit in branch ${found}!`)
+          const hook = createPushHook({
+            branch: found,
+            commit: {
+              id: sha,
+              url: commitInfo.html_url,
+              message: commitInfo.commit.message,
+              timestamp: commitInfo.committer.date,
+              author: {
+                name: commitInfo.author.login,
+                avatar_url: commitInfo.author.avatar_url
+              }
+            },
+            org: {
+              name: owner
+            },
+            repo: {
+              name: repo,
+              id: repoInfo.id,
+              url: repoInfo.html_url
+            }
+          })
+
+          log('Pushing to drone...')
+          return pushToDrone(hook, url)
+        })
+      })
+      .catch((err) => {
+        log('Error! ' + err.message, err)
+      })
 
   })
 }
