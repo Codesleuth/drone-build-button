@@ -24,3 +24,5 @@ If only Drone had a "Build now" button...?
 2. Click the extension button in the top right
 3. Click `Build`
 4. Send me beer
+
+![demo](drone-build-button.gif)
