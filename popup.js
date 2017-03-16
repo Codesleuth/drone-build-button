@@ -186,7 +186,9 @@ function getCommitInfo(server, token, owner, repo, sha) {
   })
 }
 
-function buildClick() {
+function buildClick(e) {
+
+  e.target.setAttribute('disabled', '')
 
   chrome.tabs.getSelected(null, (tab) => {
     const urlRegex = tab.url.match(/^(https?:\/\/.+\..+)\/(.+)\/(.+)\/(?:pull\/\d+\/commits|commit)\/([a-f0-9]+)$/i)

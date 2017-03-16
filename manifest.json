@@ -11,7 +11,7 @@
     "activeTab",
     "storage",
     "webRequestBlocking",
-    "*://*"
+    "*://*/*"
   ],
   "options_ui": {
     "page": "options.html",
