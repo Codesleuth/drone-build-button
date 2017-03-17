@@ -221,7 +221,7 @@ function buildClick(e) {
               id: sha,
               url: commitInfo.html_url,
               message: commitInfo.commit.message,
-              timestamp: commitInfo.committer.date,
+              timestamp: commitInfo.commit.committer.date,
               author: {
                 name: commitInfo.author.login,
                 avatar_url: commitInfo.author.avatar_url
