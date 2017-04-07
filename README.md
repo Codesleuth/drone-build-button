@@ -11,7 +11,7 @@ If only Drone had a "Build now" button...?
 
 ## Getting Started
 
-1. Clone or download this repository and extra to a folder somewhere
+1. Clone or download this repository and extract to a folder somewhere
 2. Go to [`chrome://extensions`](chrome://extensions) and click `Developer mode`
 3. Click `Load unpacked extension...` and choose the folder where you cloned or unzipped this repository
 4. Click `Options` in the _Drone Build Button_ extension in the list
